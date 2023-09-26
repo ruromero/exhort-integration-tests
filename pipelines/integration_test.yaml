@@ -1,44 +1,60 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: integration-exhort-app
+  name: exhort-integration-tests
 spec:
-  description: >-
-    Expects a Snapshot of a simple application with endpoint containing the expected output to be deployed on an environment. 
-    A secret containing the kubeconfig for the environment needs to be mounted via the cluster-credentials workspace binding.
-    The route to the single component is expected to have the same name as the component (default appstudio behavior).
-
-    Expects the Application to be up and healthy.
-
-    Expects the Exhort application to process the provided CycloneDX and SPDX SBOMS.
   params:
-    - description: 'Snapshot of the application'
-      name: SNAPSHOT
-      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
-      type: string
-    - description: 'Namespace where the application is running'
-      name: NAMESPACE
-      default: "default"
-      type: string
-  tasks:
-    - name: test-analysis
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/ruromero/exhort-integration-tests
-          - name: revision
-            value: complex-it
-          - name: pathInRepo
-            value: tasks/test_analysis.yaml
-      params:
-        - name: SNAPSHOT
-          value: $(params.SNAPSHOT)
-        - name: NAMESPACE
-          value: $(params.NAMESPACE)
-      workspaces:
-        - name: cluster-credentials
-          workspace: cluster-credentials
+    - name: url
+    - default: ""
+      description: Revision to checkout. (branch, tag, sha, ref, etc...)
+      name: revision
+    - name: context
+      default: ""
+    - name: app-path
+      default: "target"
+  results:
+    - name: JAVA_COMMUNITY_DEPENDENCIES
+      value: $(tasks.maven-run.results.JAVA_COMMUNITY_DEPENDENCIES)
   workspaces:
-    - name: cluster-credentials
-      optional: true
+    - name: shared-workspace
+    - name: maven-settings
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+      params:
+        - name: url
+          value: "$(params.url)"
+        - name: revision
+          value: "$(params.revision)"
+        - name: subdirectory
+          value: ""
+        - name: deleteExisting
+          value: "true"
+    - name: maven-run
+      taskRef:
+        name: maven
+      runAfter:
+        - fetch-repository
+      params:
+        - name: MAVEN_IMAGE
+          value: quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-20
+        - name: MAVEN_MIRROR_URL
+          value: http://jvm-build-workspace-artifact-cache.$(context.taskRun.namespace).svc.cluster.local
+        - name: CONTEXT_DIR
+          value: "$(params.context)"
+        - name: DEPENDENCY_ANALYSER_PATH
+          value: "$(params.app-path)"
+        - name: GOALS
+          value:
+            - clean
+            - verify
+            - -Pnative
+      workspaces:
+        - name: maven-settings
+          workspace: maven-settings
+        - name: source
+          workspace: shared-workspace
