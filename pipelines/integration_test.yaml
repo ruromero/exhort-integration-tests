@@ -4,14 +4,16 @@ metadata:
   name: exhort-integration-tests
 spec:
   params:
-    - name: url
-    - default: ""
-      description: Revision to checkout. (branch, tag, sha, ref, etc...)
+    - description: 'Git Repository URL to clone'
+      name: git-url
+      type: string
+    - description: 'Revision'
       name: revision
-    - name: context
-      default: ""
-    - name: app-path
-      default: "target"
+      type: string
+    - description: 'The context directory within the repository for sources on which we want to execute maven goals. (Default: ".")'
+      name: path-context
+      default: '.'
+      type: string
   results:
     - name: JAVA_COMMUNITY_DEPENDENCIES
       value: $(tasks.maven-run.results.JAVA_COMMUNITY_DEPENDENCIES)
@@ -27,7 +29,7 @@ spec:
           workspace: shared-workspace
       params:
         - name: url
-          value: "$(params.url)"
+          value: "$(params.git-url)"
         - name: revision
           value: "$(params.revision)"
         - name: subdirectory
@@ -45,9 +47,7 @@ spec:
         - name: MAVEN_MIRROR_URL
           value: http://jvm-build-workspace-artifact-cache.$(context.taskRun.namespace).svc.cluster.local
         - name: CONTEXT_DIR
-          value: "$(params.context)"
-        - name: DEPENDENCY_ANALYSER_PATH
-          value: "$(params.app-path)"
+          value: "$(params.path-context)"
         - name: GOALS
           value:
             - clean
