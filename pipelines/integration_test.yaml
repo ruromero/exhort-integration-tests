@@ -7,9 +7,11 @@ spec:
     - description: 'Git Repository URL to clone'
       name: git-url
       type: string
+      default: '{{repo_url}}'
     - description: 'Revision'
       name: revision
       type: string
+      default: '{{revision}}'
     - description: 'The context directory within the repository for sources on which we want to execute maven goals. (Default: ".")'
       name: path-context
       default: '.'
